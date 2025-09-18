@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ORI - Observatorio de Redes Interdisciplinarias</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Vis.js para la visualización de redes -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Estilos personalizados para mejorar la apariencia */
+        html, body {
+            height: 100%;
+            overflow: hidden; /* Evita el scroll en el body */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        #network {
+            width: 100%;
+            height: 100%;
+            border-radius: 0.75rem;
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        
+        .vis-network .vis-node.vis-selected {
+            border-color: #2563eb;
+            border-width: 4px;
+        }
+        
+        .left-panel-container {
+            overflow-y: auto;
+        }
+        .left-panel-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .left-panel-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .left-panel-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        .left-panel-container::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="h-screen">
+
+    <div class="flex h-full">
+        <!-- Panel Lateral (Izquierda) -->
+        <aside class="w-full max-w-md p-6 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 left-panel-container">
+            <!-- Logo y Encabezado -->
+            <div class="flex items-center gap-4 mb-8 flex-shrink-0">
+                <div class="bg-blue-600 text-white p-3 rounded-xl shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 256 256">
+                        <path d="M244,52a12,12,0,0,1-12,12H192v40h28a12,12,0,0,1,0,24H192v40h32a12,12,0,0,1,0,24H24a12,12,0,0,1,0-24H56V128H24a12,12,0,0,1,0-24H56V64H24A12,12,0,0,1,24,40H224A12,12,0,0,1,244,52ZM180,64V192H72V64Z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">ORI</h1>
+                    <p class="text-sm text-gray-500 -mt-1">Observatorio de Redes Interdisciplinarias</p>
+                </div>
+            </div>
+
+            <!-- Sección de Ingreso de Datos -->
+            <div class="flex flex-col mb-8">
+                <h2 class="text-lg font-semibold mb-3 flex items-center gap-2"><i class="ph-bold ph-database"></i>Ingreso de Datos</h2>
+                <textarea id="dataInput" class="w-full h-56 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm" placeholder="Pega tus datos aquí o carga un archivo CSV..."></textarea>
+                <div class="grid grid-cols-3 gap-2 mt-3">
+                    <button id="analyzeBtn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow flex items-center justify-center gap-2"><i class="ph-bold ph-graph"></i>Visualizar</button>
+                    <button id="loadSampleBtn" class="w-full bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2"><i class="ph-bold ph-file-text"></i>Ejemplo</button>
+                    <button id="uploadCsvBtn" class="w-full bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-600 transition-colors shadow flex items-center justify-center gap-2"><i class="ph-bold ph-upload-simple"></i>Cargar CSV</button>
+                </div>
+                <input type="file" id="csvFileInput" class="hidden" accept=".csv">
+                <button id="downloadBtn" class="mt-2 w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors shadow flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled><i class="ph-bold ph-download-simple"></i>Descargar Red</button>
+            </div>
+            
+            <!-- Análisis Estratégico -->
+            <div class="flex flex-col flex-grow min-h-0">
+                 <h2 class="text-lg font-semibold mb-3 flex items-center gap-2"><i class="ph-bold ph-chart-line-up"></i>Análisis Estratégico</h2>
+                 <div id="results" class="space-y-4 pr-2">
+                    <div class="text-center text-gray-500 pt-8">
+                        <i class="ph-light ph-magnifying-glass text-5xl"></i>
+                        <p class="mt-2">Los resultados del análisis aparecerán aquí.</p>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Leyenda -->
+            <div class="mt-8 flex-shrink-0">
+                <h2 class="text-lg font-semibold mb-3 flex items-center gap-2"><i class="ph-bold ph-map-trifold"></i>Leyenda</h2>
+                <div class="space-y-2 text-sm">
+                    <div class="flex items-center"><div class="w-4 h-4 rounded-full bg-red-500 border-2 border-red-700 mr-2"></div><span>Autor</span></div>
+                    <div class="flex items-center"><div class="w-4 h-4 rounded-full bg-sky-500 border-2 border-sky-700 mr-2"></div><span>Disciplina</span></div>
+                    <div class="flex items-center"><div class="w-4 h-4 transform rotate-45 bg-amber-400 border-2 border-amber-600 mr-2"></div><span>Laboratorio</span></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Área Principal (Derecha) -->
+        <main class="flex-grow p-6">
+            <div id="network-container" class="relative w-full h-full">
+                <div id="network"></div>
+                <div id="loadingMessage" class="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center rounded-lg">
+                    <div class="text-center text-gray-600">
+                        <i class="ph-bold ph-graph text-5xl"></i>
+                        <p class="mt-2 text-lg font-medium">La visualización de la red aparecerá aquí</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', () => {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const loadSampleBtn = document.getElementById('loadSampleBtn');
+            const uploadCsvBtn = document.getElementById('uploadCsvBtn');
+            const csvFileInput = document.getElementById('csvFileInput');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const dataInput = document.getElementById('dataInput');
+            const networkContainer = document.getElementById('network');
+            const resultsContainer = document.getElementById('results');
+            const loadingMessage = document.getElementById('loadingMessage');
+            
+            let network = null;
+
+            const sampleData = `Nombre paper: Avances en Nanotecnología Aplicada
+Disciplinas: Física, Química, Ciencia de Materiales
+Autores: Ana Torres, Carlos Ruiz
+Laboratorio: L1
+
+Nombre paper: Genómica Comparativa de Especies Marinas
+Disciplinas: Biología, Genética, Oceanografía
+Autores: Laura Gómez, David Chen, Ana Torres
+Laboratorio: L2
+
+Nombre paper: Impacto del Cambio Climático en Ecosistemas
+Disciplinas: Ecología, Climatología, Oceanografía
+Autores: Sofía Vargas, David Chen
+Laboratorio: L3
+
+Nombre paper: Desarrollo de Nuevos Polímeros
+Disciplinas: Química, Ciencia de Materiales
+Autores: Carlos Ruiz, Elena Moreno
+Laboratorio: L1`;
+
+            loadSampleBtn.addEventListener('click', () => {
+                dataInput.value = sampleData;
+            });
+            
+            uploadCsvBtn.addEventListener('click', () => {
+                csvFileInput.click();
+            });
+
+            csvFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) {
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const text = e.target.result;
+                    try {
+                        const formattedText = csvToOriFormat(text);
+                        dataInput.value = formattedText;
+                    } catch (error) {
+                        alert(`Error al procesar el archivo CSV: ${error.message}`);
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            });
+
+            function csvToOriFormat(csvText) {
+                const lines = csvText.trim().split('\n');
+                const header = lines[0].split(',').map(h => h.trim());
+                const requiredHeaders = ['Nombre paper', 'Disciplinas', 'Autores', 'Laboratorio'];
+                
+                if (JSON.stringify(header) !== JSON.stringify(requiredHeaders)) {
+                    throw new Error(`Los encabezados del CSV deben ser exactamente: ${requiredHeaders.join(',')}`);
+                }
+
+                const rows = lines.slice(1);
+                return rows.map(row => {
+                    const data = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+                    return `Nombre paper: ${data[0] ? data[0].replace(/"/g, '') : ''}
+Disciplinas: ${data[1] ? data[1].replace(/"/g, '') : ''}
+Autores: ${data[2] ? data[2].replace(/"/g, '') : ''}
+Laboratorio: ${data[3] ? data[3].replace(/"/g, '') : ''}`;
+                }).join('\n\n');
+            }
+
+            const sanitizeId = (str) => {
+                // Función mejorada para manejar acentos y caracteres especiales
+                return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, '_');
+            }
+
+            analyzeBtn.addEventListener('click', () => {
+                const rawData = dataInput.value.trim();
+                if (!rawData) {
+                    resultsContainer.innerHTML = `<div class="text-center text-red-500 p-8 bg-red-50 rounded-lg fade-in"><i class="ph-light ph-warning-circle text-5xl"></i><p class="mt-2">Por favor, ingresa datos para analizar.</p></div>`;
+                    return;
+                }
+                
+                loadingMessage.innerHTML = `<div class="text-center"><i class="ph-bold ph-spinner-gap text-4xl text-blue-600 animate-spin"></i><p class="mt-2 text-lg font-medium text-gray-700">Calculando red...</p></div>`;
+                loadingMessage.classList.remove('hidden');
+                downloadBtn.disabled = true;
+
+                if (network) {
+                    network.destroy();
+                    network = null;
+                }
+                networkContainer.innerHTML = '';
+
+                setTimeout(() => {
+                    try {
+                        const entries = rawData.split(/\n\s*\n/);
+                        const papers = entries.map(entry => {
+                            const paperData = { name: null, disciplines: [], authors: [], lab: null };
+                            entry.split('\n').forEach(line => {
+                                const parts = line.split(':');
+                                if (parts.length < 2) return;
+                                const key = parts[0].trim().toLowerCase();
+                                const value = parts.slice(1).join(':').trim();
+                                if (key.startsWith('nombre paper')) paperData.name = value;
+                                else if (key.startsWith('disciplinas')) paperData.disciplines = value.split(',').map(d => d.trim()).filter(Boolean);
+                                else if (key.startsWith('autores')) paperData.authors = value.split(',').map(a => a.trim()).filter(Boolean);
+                                else if (key.startsWith('laboratorio')) paperData.lab = value.trim();
+                            });
+                            return paperData;
+                        }).filter(p => p.name);
+
+                        if (papers.length === 0) {
+                            throw new Error("No se pudieron procesar las entradas. Revisa el formato del texto.");
+                        }
+
+                        const disciplineFrequency = new Map();
+                        papers.forEach(p => {
+                            p.disciplines.forEach(d => {
+                                disciplineFrequency.set(d, (disciplineFrequency.get(d) || 0) + 1);
+                            });
+                        });
+
+                        const allDisciplines = new Set();
+                        const allAuthors = new Set();
+                        const allLabs = new Set();
+                        
+                        papers.forEach(p => {
+                            p.disciplines.forEach(d => allDisciplines.add(d));
+                            p.authors.forEach(a => allAuthors.add(a));
+                            if (p.lab) allLabs.add(p.lab);
+                        });
+                        
+                        const disciplineNodes = Array.from(allDisciplines).map(d => {
+                            const count = disciplineFrequency.get(d) || 1;
+                            return {
+                                id: `d_${sanitizeId(d)}`,
+                                label: d,
+                                shape: 'dot',
+                                size: 16 + (count * 2.5),
+                                title: `${count} apariciones`,
+                                color: { background: '#0ea5e9', border: '#0369a1' },
+                                group: 'discipline'
+                            };
+                        });
+                        const authorNodes = Array.from(allAuthors).map(a => ({ id: `a_${sanitizeId(a)}`, label: a, shape: 'dot', size: 22, color: { background: '#ef4444', border: '#b91c1c' }, group: 'author' }));
+                        const labNodes = Array.from(allLabs).map(l => ({ id: `l_${sanitizeId(l)}`, label: l, shape: 'diamond', size: 28, color: { background: '#f59e0b', border: '#b45309' }, group: 'lab' }));
+
+                        const nodes = [...authorNodes, ...disciplineNodes, ...labNodes];
+                        const edges = [];
+                        const coAuthorship = {};
+                        const disciplineCollab = {};
+                        const authorLabs = new Map();
+                        const authorDisciplines = new Map();
+
+                        papers.forEach(p => {
+                            const authorIds = p.authors.map(sanitizeId);
+                            const disciplineIds = p.disciplines.map(sanitizeId);
+                            const labId = p.lab ? sanitizeId(p.lab) : null;
+
+                            p.authors.forEach(author => {
+                                if (!authorLabs.has(author)) authorLabs.set(author, new Set());
+                                if (p.lab) authorLabs.get(author).add(p.lab);
+
+                                if (!authorDisciplines.has(author)) authorDisciplines.set(author, new Set());
+                                p.disciplines.forEach(disc => authorDisciplines.get(author).add(disc));
+                            });
+
+                            authorIds.forEach(authorId => {
+                                disciplineIds.forEach(discId => edges.push({ from: `a_${authorId}`, to: `d_${discId}`, dashes: true, color: '#fca5a5', length: 250 }));
+                            });
+
+                            for (let i = 0; i < authorIds.length; i++) {
+                                for (let j = i + 1; j < authorIds.length; j++) {
+                                    const key = [`a_${authorIds[i]}`, `a_${authorIds[j]}`].sort().join('-');
+                                    coAuthorship[key] = (coAuthorship[key] || 0) + 1;
+                                }
+                            }
+                            
+                            for (let i = 0; i < disciplineIds.length; i++) {
+                                for (let j = i + 1; j < disciplineIds.length; j++) {
+                                    const key = [`d_${disciplineIds[i]}`, `d_${disciplineIds[j]}`].sort().join('-');
+                                    disciplineCollab[key] = (disciplineCollab[key] || 0) + 1;
+                                }
+                            }
+
+                            if (labId) {
+                                authorIds.forEach(authorId => {
+                                    edges.push({ from: `a_${authorId}`, to: `l_${labId}`, color: '#fbbf24', value: 2, length: 300 });
+                                });
+                            }
+                        });
+
+                        for (const [key, count] of Object.entries(coAuthorship)) {
+                            const [from, to] = key.split('-');
+                            edges.push({ from, to, value: count * 2, title: `${count} co-autoría(s)`, color: { color: '#991b1b', highlight: '#7f1d1d' }, length: 150 });
+                        }
+                        
+                        for (const [key, count] of Object.entries(disciplineCollab)) {
+                            const [from, to] = key.split('-');
+                            edges.push({ from, to, value: count, title: `${count} colaboración(es)`, color: { color: '#64748b', highlight: '#0f172a' }, length: 200 });
+                        }
+
+                        const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+                        const options = {
+                            layout: { randomSeed: 2 },
+                            physics: {
+                                solver: 'forceAtlas2Based',
+                                forceAtlas2Based: { gravitationalConstant: -100, centralGravity: 0.01, springLength: 250, damping: 0.4 },
+                                stabilization: { iterations: 400 }
+                            },
+                            interaction: { hover: true, tooltipDelay: 200, navigationButtons: true, keyboard: true },
+                            nodes: { borderWidth: 2, font: { color: '#ffffff', size: 14, strokeWidth: 2, strokeColor: 'rgba(0,0,0,0.7)' } },
+                            edges: { width: 1.5, smooth: { type: 'continuous' } }
+                        };
+                        
+                        network = new vis.Network(networkContainer, data, options);
+
+                        network.on("stabilizationIterationsDone", () => {
+                            network.setOptions({ physics: false });
+                            loadingMessage.classList.add('hidden');
+                            downloadBtn.disabled = false;
+                        });
+
+                        updateResults(coAuthorship, authorLabs, authorDisciplines, allDisciplines, disciplineCollab, disciplineFrequency, nodes);
+                    } catch (error) {
+                        console.error("Error al analizar los datos:", error);
+                        resultsContainer.innerHTML = `<div class="text-center text-red-500 p-8 bg-red-50 rounded-lg fade-in"><i class="ph-light ph-bug text-5xl"></i><p class="mt-2 font-semibold">Ocurrió un error</p><p class="text-sm">${error.message}</p></div>`;
+                        loadingMessage.classList.add('hidden');
+                    }
+                }, 0);
+            });
+
+            downloadBtn.addEventListener('click', () => {
+                const canvas = networkContainer.getElementsByTagName('canvas')[0];
+                if (canvas) {
+                    const link = document.createElement('a');
+                    link.href = canvas.toDataURL('image/png');
+                    link.download = 'ORI-network.png';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } else {
+                    alert("No se pudo encontrar la red para descargar. Por favor, genera una primero.");
+                }
+            });
+
+            function createAnalysisCard(title, icon, content) {
+                if (!content || content.trim() === '') {
+                    return '';
+                }
+                return `<div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 fade-in"><h4 class="text-md font-semibold text-gray-800 flex items-center gap-2 mb-2"><i class="ph-bold ${icon} text-blue-600"></i>${title}</h4><div class="text-sm text-gray-600 space-y-1">${content}</div></div>`;
+            }
+
+            function updateResults(coAuthorship, authorLabs, authorDisciplines, allDisciplines, disciplineCollab, disciplineFrequency, nodes) {
+                let html = '';
+                const bridgeAuthors = [];
+                authorLabs.forEach((labs, author) => {
+                    if (labs.size > 1) bridgeAuthors.push({ author, labs: Array.from(labs).join(', ') });
+                });
+                let bridgeAuthorsContent = bridgeAuthors.length > 0 ? `<ul class="list-disc list-inside">${bridgeAuthors.map(item => `<li><strong>${item.author}</strong>: en ${item.labs}</li>`).join('')}</ul>` : '<p>No hay autores colaborando entre distintos laboratorios.</p>';
+                html += createAnalysisCard('Autores Puente (Inter-Laboratorio)', 'ph-arrows-split', bridgeAuthorsContent);
+
+                const sortedAuthorsByDiscipline = Array.from(authorDisciplines.entries()).map(([author, disciplines]) => ({ author, count: disciplines.size })).sort((a, b) => b.count - a.count);
+                let interdisciplinaryAuthorsContent = sortedAuthorsByDiscipline.slice(0, 5).map(item => `<p><strong>${item.author}</strong>: ${item.count} disciplina(s)</p>`).join('');
+                html += createAnalysisCard('Autores más Interdisciplinarios', 'ph-books', interdisciplinaryAuthorsContent);
+
+                const sortedByFrequency = [...disciplineFrequency.entries()].sort((a, b) => b[1] - a[1]);
+                let mostFrequentContent = '';
+                if (sortedByFrequency.length > 0) {
+                    const [name, count] = sortedByFrequency[0];
+                    mostFrequentContent = `<p><strong>${name}</strong>: ${count} apariciones</p>`;
+                } else {
+                    mostFrequentContent = '<p>No hay datos.</p>';
+                }
+                html += createAnalysisCard('Disciplina más Frecuente', 'ph-star', mostFrequentContent);
+
+
+                const collaboratingDisciplines = new Set();
+                Object.keys(disciplineCollab).forEach(key => {
+                    const [d1, d2] = key.split('-');
+                    collaboratingDisciplines.add(d1.substring(2));
+                    collaboratingDisciplines.add(d2.substring(2));
+                });
+                const isolatedDisciplines = Array.from(allDisciplines).filter(d => !collaboratingDisciplines.has(d));
+                const sortedDisciplineCollabs = Object.entries(disciplineCollab).sort(([, a], [, b]) => b - a);
+                
+                const findLabelById = (id) => {
+                    const node = nodes.find(n => n.id === id);
+                    return node ? node.label : id;
+                };
+
+                let disciplineCollabContent = sortedDisciplineCollabs.length > 0 ? `<ul class="list-disc list-inside">${sortedDisciplineCollabs.slice(0, 5).map(([key, count]) => { 
+                    const [d1_id, d2_id] = key.split('-');
+                    const d1_label = findLabelById(d1_id);
+                    const d2_label = findLabelById(d2_id);
+                    return `<li><strong>${d1_label} & ${d2_label}</strong>: ${count} paper(s)</li>`
+                }).join('')}</ul>` : '<p>No se encontraron colaboraciones directas.</p>';
+                html += createAnalysisCard('Colaboraciones Clave (Disciplinas)', 'ph-handshake', disciplineCollabContent);
+
+                let isolatedDisciplinesContent = isolatedDisciplines.length > 0 ? `<p>${isolatedDisciplines.join(', ')}</p>` : '<p>Todas las disciplinas están conectadas.</p>';
+                html += createAnalysisCard('Disciplinas Aisladas', 'ph-island', isolatedDisciplinesContent);
+
+                const disciplineCounts = new Map();
+                allDisciplines.forEach(d => disciplineCounts.set(d, 0));
+
+                Object.entries(disciplineCollab).forEach(([key, count]) => {
+                    const [d1_id, d2_id] = key.split('-');
+                    const d1 = findLabelById(d1_id);
+                    const d2 = findLabelById(d2_id);
+                    disciplineCounts.set(d1, (disciplineCounts.get(d1) || 0) + count);
+                    disciplineCounts.set(d2, (disciplineCounts.get(d2) || 0) + count);
+                });
+
+                const sortedDisciplineCounts = [...disciplineCounts.entries()].sort((a, b) => a[1] - b[1]);
+
+                let leastIntegratedContent = '';
+                if (sortedDisciplineCounts.length > 0) {
+                    const [name, count] = sortedDisciplineCounts[0];
+                    leastIntegratedContent = `<p><strong>${name}</strong>: ${count} colaboración(es)</p>`;
+                } else {
+                    leastIntegratedContent = '<p>No hay suficientes datos para determinar.</p>';
+                }
+                html += createAnalysisCard('Disciplina Menos Integrada', 'ph-link-break', leastIntegratedContent);
+
+
+                resultsContainer.innerHTML = html;
+            }
+        });
+    </script>
+</body>
+</html>
